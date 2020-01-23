@@ -210,20 +210,23 @@ def optim_nn_greedy(f_l, f_r, input_size, use_cuda=False, max_iter=200, verbose=
     return current_spec, sigma
 
 
-def optim_nn_pca_greedy(U, V, max_iteration=10, verbose=True):
+def optim_nn_pca_greedy(U, V, max_iteration=10, verbose=True, use_tqdm=True, 
+                        norm_ord=2):
     """ U is k x n and V is n x k
 
     Goal of this optimisation method is to get an approximation of the upper
     bound using only a few of the singular vectors associated to the highest
     singular values.
     """
-    from tqdm import tqdm
+    if use_tqdm:
+        from tqdm import tqdm
+
     k = U.shape[0]
     n = U.shape[1]
 
     sigma = np.ones(n)
     M = torch.mm(U, V)
-    current_spec = sp.linalg.norm(M, 2)
+    current_spec = sp.linalg.norm(M, norm_ord)
     stop_criterion = False
     it = 0
     while not stop_criterion:
@@ -233,11 +236,15 @@ def optim_nn_pca_greedy(U, V, max_iteration=10, verbose=True):
         n_changes_n = 0
         previous = current_spec
         highest_idx = -1
-        for i in tqdm(range(len(sigma))):
+
+        iterable = range(len(sigma))
+        if use_tqdm:
+            iterable = tqdm(iterable)
+        for i in iterable:
             change = 1 - sigma[i] # if 1 then 0, if 0 then 1
             m_change = torch.ger(U[:, i], V[i, :])
             tmpM = M + (2 * change - 1) * m_change
-            spec = sp.linalg.norm(tmpM, 2)
+            spec = sp.linalg.norm(tmpM, norm_ord)
             if current_spec < spec:
                 highest_idx = i
                 current_spec = spec
